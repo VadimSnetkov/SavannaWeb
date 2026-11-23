@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Savanna.Core/Savanna.Core.csproj" />
+    <ProjectReference Include="../Savanna.Animals.Zebra/Savanna.Animals.Zebra.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <Target Name="CopyAnimalPlugins" AfterTargets="Build">
+    <ItemGroup>
+      <AnimalPluginFiles Include="../Savanna.Animals.Zebra/bin/$(Configuration)/net10.0/*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(AnimalPluginFiles)" DestinationFolder="$(OutDir)Plugins/Zebra" SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="PublishAnimalPlugins" AfterTargets="Publish">
+    <ItemGroup>
+      <PublishedPluginFiles Include="$(OutDir)Plugins/**/*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(PublishedPluginFiles)" DestinationFiles="@(PublishedPluginFiles->'$(PublishDir)Plugins/%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
+</Project>
