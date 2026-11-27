@@ -1,17 +1,17 @@
-﻿using Savanna.Core.Models;
+using Savanna.Core.Models;
 using Savanna.Core.Service;
 
 namespace Savanna.Core.Behavior;
 
 public sealed class AntelopeBehavior : IAnimalBehavior
 {
-    private readonly MovementService _movementService;
+    private readonly IMovementService _movementService;
 
     public string Type => AnimalType.Antelope;
 
     /// Summary:
     /// Creates the antelope behaviour with shared movement calculations.
-    public AntelopeBehavior(MovementService movementService)
+    public AntelopeBehavior(IMovementService movementService)
     {
         ArgumentNullException.ThrowIfNull(movementService);
 

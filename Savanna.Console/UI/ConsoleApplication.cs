@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
+using Savanna.Core.Exceptions;
 using Savanna.Core.Configuration;
 using Savanna.Core.Models;
 using Savanna.Core.Service;
@@ -51,7 +52,7 @@ public sealed class ConsoleApplication
 
         try
         {
-            _renderer.Render(_simulation.State, _catalog.LastBehaviorError ?? _message);
+            _renderer.Render(_simulation.State, _message);
 
             var roundTimer = Stopwatch.StartNew();
 
@@ -82,14 +83,21 @@ public sealed class ConsoleApplication
                 if (roundTimer.ElapsedMilliseconds >=
                     _options.RoundDelayMilliseconds)
                 {
-                    _simulation.AdvanceRound();
+                    try
+                    {
+                        _simulation.AdvanceRound();
+                    }
+                    catch (AnimalBehaviorException exception)
+                    {
+                        _message = exception.Message;
+                    }
                     roundTimer.Restart();
                     shouldRender = true;
                 }
 
                 if (shouldRender)
                 {
-                    _renderer.Render(_simulation.State, _catalog.LastBehaviorError ?? _message);
+                    _renderer.Render(_simulation.State, _message);
                 }
 
                 await Task.Delay(InputPollMilliseconds);

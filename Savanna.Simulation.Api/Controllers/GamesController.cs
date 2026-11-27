@@ -7,6 +7,7 @@ namespace Savanna.Simulation.Api.Controllers;
 
 [ApiController]
 [Route("api/games")]
+[ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
 public sealed class GamesController : ControllerBase
 {
     private readonly GameManager _games;
@@ -25,46 +26,67 @@ public sealed class GamesController : ControllerBase
     /// Summary:
     /// Creates a new paused game with an empty field.
     [HttpPost]
-    public ActionResult<GameResponse> Create() => Respond(_games.Create);
+    [ProducesResponseType(typeof(GameResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public ActionResult<GameResponse> Create() => ToActionResult(_games.Create());
 
     /// Summary:
     /// Returns the latest state of an existing game.
     [HttpGet("{id:guid}")]
-    public ActionResult<GameResponse> Get(Guid id) => Respond(() => _games.Access(id));
+    [ProducesResponseType(typeof(GameResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public ActionResult<GameResponse> Get(Guid id) => ToActionResult(_games.Access(id));
 
     /// Summary:
     /// Validates a species and adds it to an empty cell.
     [HttpPost("{id:guid}/animals")]
+    [ProducesResponseType(typeof(GameResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status422UnprocessableEntity)]
     public ActionResult<GameResponse> Spawn(Guid id, SpawnAnimalRequest request)
     {
         var validation = _validator.Validate(request);
         if (!validation.IsValid)
         {
-            foreach (var error in validation.Errors)
-                ModelState.AddModelError(error.PropertyName, error.ErrorMessage);
-            return ValidationProblem(ModelState);
+            var problem = new ValidationProblemDetails(validation.ToDictionary())
+            {
+                Status = StatusCodes.Status422UnprocessableEntity,
+                Title = "One or more inputs are invalid."
+            };
+            return UnprocessableEntity(problem);
         }
-        return Respond(() => _games.Access(id, game => game.Spawn(request.Species)));
+        return ToActionResult(_games.Access(id, GameCommand.AddAnimal, request.Species));
     }
 
     /// Summary:
     /// Starts automatic rounds for this game.
     [HttpPost("{id:guid}/play")]
-    public ActionResult<GameResponse> Play(Guid id) => Respond(() => _games.Access(id, game => game.Play()));
+    [ProducesResponseType(typeof(GameResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public ActionResult<GameResponse> Play(Guid id) => ToActionResult(_games.Access(id, GameCommand.Play));
 
     /// Summary:
     /// Pauses automatic rounds for this game.
     [HttpPost("{id:guid}/pause")]
-    public ActionResult<GameResponse> Pause(Guid id) => Respond(() => _games.Access(id, game => game.Pause()));
+    [ProducesResponseType(typeof(GameResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public ActionResult<GameResponse> Pause(Guid id) => ToActionResult(_games.Access(id, GameCommand.Pause));
 
     /// Summary:
     /// Advances one round in a paused game.
     [HttpPost("{id:guid}/step")]
-    public ActionResult<GameResponse> Step(Guid id) => Respond(() => _games.Access(id, game => game.Step()));
+    [ProducesResponseType(typeof(GameResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public ActionResult<GameResponse> Step(Guid id) => ToActionResult(_games.Access(id, GameCommand.Step));
 
     /// Summary:
     /// Ends a game and discards its unsaved state.
     [HttpDelete("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     public IActionResult Delete(Guid id)
     {
         _games.Delete(id);
@@ -72,17 +94,21 @@ public sealed class GamesController : ControllerBase
     }
 
     /// Summary:
-    /// Translates expected game errors into clear HTTP problem responses.
-    private ActionResult<GameResponse> Respond(Func<GameResponse> action)
+    /// Maps ordinary service outcomes to explicit HTTP results without catching exceptions.
+    private ActionResult<GameResponse> ToActionResult(GameResult result)
     {
-        try { return Ok(action()); }
-        catch (KeyNotFoundException exception)
+        return result.Status switch
         {
-            return Problem(statusCode: StatusCodes.Status404NotFound, detail: exception.Message);
-        }
-        catch (InvalidOperationException exception)
-        {
-            return Problem(statusCode: StatusCodes.Status409Conflict, detail: exception.Message);
-        }
+            GameResultStatus.Success => Ok(result.Game),
+            GameResultStatus.NotFound => NotFound(new ProblemDetails
+            {
+                Status = StatusCodes.Status404NotFound, Title = "Game not found.", Detail = result.Message
+            }),
+            GameResultStatus.Conflict => Conflict(new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict, Title = "Game command cannot be completed.", Detail = result.Message
+            }),
+            _ => throw new ArgumentOutOfRangeException(nameof(result))
+        };
     }
 }

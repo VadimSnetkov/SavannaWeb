@@ -1,14 +1,8 @@
 import type { Game, GameCommand } from '../models/game';
+import { ApiError } from '../models/ApiError';
+import { apiErrorMessage } from './apiErrorMessage';
 
 const requestTimeoutMilliseconds = 10_000;
-
-export class ApiError extends Error {
-  /// Summary:
-  /// Keeps the HTTP status so an expired game can be handled separately.
-  constructor(message: string, public readonly status: number) {
-    super(message);
-  }
-}
 
 /// Summary:
 /// Calls the backend and converts problem responses into readable messages.
@@ -26,9 +20,7 @@ async function request<T>(path: string, method = 'GET', body?: unknown): Promise
   }
   if (!response.ok) {
     const problem = await response.json().catch(() => ({}));
-    const validationErrors = problem.errors as Record<string, string[]> | undefined;
-    const message = validationErrors ? Object.values(validationErrors).flat().join(' ') : problem.detail;
-    throw new ApiError(message || 'The request failed. Please try again.', response.status);
+    throw new ApiError(apiErrorMessage(response.status, problem), response.status);
   }
   return response.status === 204 ? undefined as T : response.json() as Promise<T>;
 }

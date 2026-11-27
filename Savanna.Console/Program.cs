@@ -1,4 +1,4 @@
-﻿using FluentValidation;
+using FluentValidation;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Savanna.Console.UI;
@@ -47,7 +47,7 @@ internal static class Program
                 IValidator<SimulationOptions>,
                 SimulationOptionsValidator>();
 
-            services.AddSingleton<MovementService>();
+            services.AddSingleton<IMovementService, MovementService>();
 
             services.AddSingleton<IAnimalBehavior, AntelopeBehavior>();
             services.AddSingleton<IAnimalBehavior, LionBehavior>();
@@ -59,8 +59,9 @@ internal static class Program
 
             services.AddSingleton<AnimalCatalog>();
             services.AddSingleton<AnimalSpawnService>();
-            services.AddSingleton<HealthService>();
-            services.AddSingleton<BirthService>();
+            services.AddSingleton<IHealthService, HealthService>();
+            services.AddSingleton<IBirthService, BirthService>();
+            services.AddSingleton<IAnimalMovementService, AnimalMovementService>();
             services.AddSingleton<SimulationService>();
 
             services.AddSingleton<ConsoleRenderer>();

@@ -1,4 +1,5 @@
 using Savanna.Core.Behavior;
+using Savanna.Core.Extensions;
 using Savanna.Core.Models;
 using Savanna.Core.Service;
 
@@ -6,9 +7,9 @@ namespace Savanna.Animals.Zebra;
 
 public sealed class ZebraBehavior : IAnimalBehavior
 {
-    private readonly MovementService _movement;
+    private readonly IMovementService _movement;
 
-    public string Type => "Zebra";
+    public string Type => this.GetSpeciesName();
 
     /// Summary:
     /// Creates a zebra behaviour that the plugin loader can instantiate.

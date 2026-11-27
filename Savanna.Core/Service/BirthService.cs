@@ -2,7 +2,7 @@ using Savanna.Core.Models;
 
 namespace Savanna.Core.Service;
 
-public sealed class BirthService
+public sealed class BirthService : IBirthService
 {
     private const int RequiredNearbyRounds = 3;
     private const int BirthDistance = 1;

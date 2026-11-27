@@ -1,4 +1,5 @@
-using Savanna.Simulation.Api.Service;
+using Savanna.Simulation.Api.Extensions;
+using Serilog;
 
 namespace Savanna.Simulation.Api;
 
@@ -9,12 +10,17 @@ public partial class Program
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
-        builder.Services.AddControllers();
-        builder.Services.AddProblemDetails();
+        builder.Services.AddSavannaApi(builder.Configuration);
         builder.Services.AddSavannaSimulation(builder.Configuration);
 
         var app = builder.Build();
-        app.UseExceptionHandler();
+        app.UseSerilogRequestLogging();
+        app.UseSavannaExceptionHandling();
+        if (app.Environment.IsDevelopment())
+        {
+            app.UseSwagger();
+            app.UseSwaggerUI();
+        }
         app.MapControllers();
         app.Run();
     }

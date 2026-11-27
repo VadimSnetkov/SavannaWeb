@@ -1,4 +1,4 @@
-﻿using Savanna.Core.Behavior;
+using Savanna.Core.Behavior;
 using Savanna.Core.Configuration;
 using Savanna.Core.Models;
 using Savanna.Core.Service;
@@ -425,7 +425,7 @@ public sealed class LifeCycleTests
         var simulation = new SimulationService(
             options,
             new SimulationOptionsValidator(),
-            catalog,
+            new AnimalMovementService(catalog, new HealthService(options)),
             random,
             new HealthService(options),
             new BirthService(spawner, random));

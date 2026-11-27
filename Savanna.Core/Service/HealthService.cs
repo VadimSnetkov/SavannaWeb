@@ -1,9 +1,9 @@
-﻿using Savanna.Core.Configuration;
+using Savanna.Core.Configuration;
 using Savanna.Core.Models;
 
 namespace Savanna.Core.Service;
 
-public sealed class HealthService
+public sealed class HealthService : IHealthService
 {
     private const decimal HealthCostPerMove = 0.5m;
 

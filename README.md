@@ -20,11 +20,11 @@ Keep it running. The backend listens at `http://localhost:5050`.
 
 ```powershell
 cd Savanna.Web
-npm ci
+npm install
 npm run dev
 ```
 
-Open **http://localhost:5173**. Both processes must be running. If PowerShell blocks `npm.ps1`, use `npm.cmd ci` and `npm.cmd run dev` instead.
+Open **http://localhost:5173**. Both processes must be running. If PowerShell blocks `npm.ps1`, use `npm.cmd install` and `npm.cmd run dev` instead.
 
 Click **Create game**, add animals, then click **Play**. Games start paused so you can populate the field first.
 
@@ -52,6 +52,8 @@ Space toggles play/pause unless a button has focus, where Space activates that b
 | `Savanna.Simulation.Api/Service/` | Per-game engine scopes, commands and server clock |
 | `Savanna.Simulation.Api/Models/` | Request and response data |
 | `Savanna.Simulation.Api/Validator/` | FluentValidation request and configuration rules |
+| `Savanna.Simulation.Api/Extensions/` | API/DI registrations and exception middleware registration |
+| `Savanna.Simulation.Api/Middleware/` | Unexpected HTTP failure logging and safe error responses |
 | `Savanna.Web/src/UI/` | React field, animal symbols and statistics panel |
 | `Savanna.Web/src/hooks/` | Commands, polling and unsaved-progress warning |
 | `Savanna.Web/src/service/` | HTTP client |
@@ -72,6 +74,12 @@ Core additions are small: stable animal IDs, a birth round and an offspring coun
 The console baseline is `VadimSnetkov/Savanna`, commit `43e5e17` (`feature/iteration-3`), including the Zebra DLL loader. This project does not modify the original console repository.
 
 ## Configuration
+
+Swagger is available at **http://localhost:5050/swagger** when the backend runs in Development. Use **Try it out** to create a game, copy its returned ID, and exercise the game endpoints.
+
+Controllers return 404 for a missing game, 409 for a conflicting command, and 422 for invalid input. Malformed JSON remains a 400 binding error. Unexpected errors are logged through Serilog and return a safe 500 response with a trace ID. Serilog's level and console output are configured in `appsettings.json`.
+
+Plugin errors now propagate out of the shared Core library. For HTTP commands, the API stops the affected game and the middleware logs the exception. For automatic rounds, the game manager stops and logs only that game; other games keep running. Create a new game after such a failure. The console handles plugin errors at its own UI boundary.
 
 Edit `Savanna.Simulation.Api/appsettings.json` for field dimensions, round delay, animal settings, plugins, idle timeout and maximum game count. Restart the backend after changes.
 
@@ -109,10 +117,10 @@ npm run test:e2e
 
 The test runner starts the frontend if needed. Tests cover controls, statistics, Zebra, display toggling, shortcuts, separate tabs, reset confirmation, reload warning, connection failure, API validation and mobile overflow. `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` optionally selects an installed Chromium executable.
 
-See `VALIDATION.md` for checks actually completed during preparation.
+See `REVIEW-FIXES.md` for every mentor comment, its solution and the checks completed for this revision.
 
 ## Continue on your personal laptop
 
-Commit the source and `Savanna.Web/package-lock.json`, then push the feature branch. Clone the repository on your personal laptop, switch to that feature branch, and repeat the startup commands. Later updates use `git pull`.
+Commit the source, then push the feature branch. `package-lock.json` stays local and is ignored, following the mentor's repository convention. Clone the repository on your personal laptop, switch to that feature branch, and repeat the startup commands. Later updates use `git pull`.
 
 `bin`, `obj`, `node_modules` and build outputs are ignored and recreated locally. There are no database contents to transfer yet. Keep work on a feature branch and merge only after mentor approval.

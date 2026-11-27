@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Game, GameCommand } from '../models/game';
-import { ApiError, gameApi } from '../service/gameApi';
+import { gameApi } from '../service/gameApi';
+import { ApiError } from '../models/ApiError';
+import { HttpStatus } from '../models/HttpStatus';
 
 /// Summary:
 /// Coordinates commands and polling so older responses cannot overwrite newer state.
@@ -30,7 +32,7 @@ export function useSimulation() {
   /// Summary:
   /// Shows connection errors and lets the user replace expired games.
   const reportError = useCallback((failure: unknown) => {
-    if (failure instanceof ApiError && failure.status === 404) accept(null);
+    if (failure instanceof ApiError && failure.status === HttpStatus.NotFound) accept(null);
     setError(failure instanceof Error ? failure.message : 'Something went wrong. Try again.');
   }, [accept]);
 

@@ -29,13 +29,13 @@ public sealed class GameManager : IDisposable
 
     /// Summary:
     /// Creates a paused game with its own dependency scope and engine state.
-    public GameResponse Create()
+    public GameResult Create()
     {
         lock (_gate)
         {
             RemoveExpired();
             if (_games.Count >= _options.MaximumGames)
-                throw new InvalidOperationException("Too many active games. End an existing game or try again later.");
+                return new GameResult(GameResultStatus.Conflict, Message: "Too many active games. End an existing game or try again later.");
             var scope = _scopeFactory.CreateScope();
             try
             {
@@ -43,7 +43,7 @@ public sealed class GameManager : IDisposable
                 game.LastAccess = _clock.GetUtcNow();
                 var response = game.Snapshot();
                 _games.Add(game.Id, scope);
-                return response;
+                return new GameResult(GameResultStatus.Success, response);
             }
             catch
             {
@@ -55,17 +55,28 @@ public sealed class GameManager : IDisposable
 
     /// Summary:
     /// Serializes reads, commands and ticking to keep every snapshot consistent.
-    public GameResponse Access(Guid id, Action<GameSessionService>? command = null)
+    public GameResult Access(Guid id, GameCommand command = GameCommand.Read, string? species = null)
     {
         lock (_gate)
         {
             RemoveExpired();
             if (!_games.TryGetValue(id, out var scope))
-                throw new KeyNotFoundException("This game has ended or expired. Start a new game.");
+                return new GameResult(GameResultStatus.NotFound, Message: "This game has ended or expired. Start a new game.");
             var game = scope.ServiceProvider.GetRequiredService<GameSessionService>();
             game.LastAccess = _clock.GetUtcNow();
-            command?.Invoke(game);
-            return game.Snapshot();
+            try
+            {
+                string? conflict = game.Execute(command, species);
+                return conflict is null
+                    ? new GameResult(GameResultStatus.Success, game.Snapshot())
+                    : new GameResult(GameResultStatus.Conflict, Message: conflict);
+            }
+            catch
+            {
+                // Stop a partially completed turn, then let HTTP middleware log the cause.
+                game.StopAfterError();
+                throw;
+            }
         }
     }
 

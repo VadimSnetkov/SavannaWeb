@@ -1,8 +1,8 @@
-﻿using Savanna.Core.Models;
+using Savanna.Core.Models;
 
 namespace Savanna.Core.Service;
 
-public sealed class MovementService
+public sealed class MovementService : IMovementService
 {
     private readonly Random _random;
 

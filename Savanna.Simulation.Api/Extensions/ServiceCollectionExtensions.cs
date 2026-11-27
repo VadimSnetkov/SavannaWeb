@@ -1,4 +1,6 @@
 using FluentValidation;
+using Savanna.Simulation.Api.Service;
+using Serilog;
 using Savanna.Core.Behavior;
 using Savanna.Core.Configuration;
 using Savanna.Core.Service;
@@ -7,10 +9,28 @@ using Savanna.Simulation.Api.Configuration;
 using Savanna.Simulation.Api.Models;
 using Savanna.Simulation.Api.Validator;
 
-namespace Savanna.Simulation.Api.Service;
+namespace Savanna.Simulation.Api.Extensions;
 
 public static class ServiceCollectionExtensions
 {
+    /// Summary:
+    /// Registers API controllers, documentation, exception responses and configured Serilog logging.
+    public static IServiceCollection AddSavannaApi(this IServiceCollection services, IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+        // Well-formed bodies reach FluentValidation even when a required string is null.
+        // JSON syntax and binding errors still receive the framework's 400 response.
+        services.AddControllers(options => options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true);
+        services.AddProblemDetails();
+        services.AddEndpointsApiExplorer();
+        services.AddSwaggerGen();
+        services.AddSerilog((provider, logger) => logger
+            .ReadFrom.Configuration(configuration)
+            .ReadFrom.Services(provider));
+        return services;
+    }
+
     /// Summary:
     /// Registers isolated game engines and loads the configured animal plugins.
     public static IServiceCollection AddSavannaSimulation(
@@ -35,7 +55,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<IValidator<SimulationOptions>, SimulationOptionsValidator>();
         services.AddScoped<Random>(_ => new Random());
-        services.AddScoped<MovementService>();
+        services.AddScoped<IMovementService, MovementService>();
         services.AddScoped<IAnimalBehavior, AntelopeBehavior>();
         services.AddScoped<IAnimalBehavior, LionBehavior>();
         foreach (var behavior in plugins.Behaviors)
@@ -46,8 +66,9 @@ public static class ServiceCollectionExtensions
         }
         services.AddScoped<AnimalCatalog>();
         services.AddScoped<AnimalSpawnService>();
-        services.AddScoped<HealthService>();
-        services.AddScoped<BirthService>();
+        services.AddScoped<IHealthService, HealthService>();
+        services.AddScoped<IBirthService, BirthService>();
+        services.AddScoped<IAnimalMovementService, AnimalMovementService>();
         services.AddScoped<SimulationService>();
         services.AddScoped<GameSessionService>();
         services.AddScoped<IValidator<SpawnAnimalRequest>, SpawnAnimalRequestValidator>();

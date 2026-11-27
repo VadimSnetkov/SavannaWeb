@@ -1,4 +1,5 @@
 using FluentValidation;
+using Savanna.Simulation.Api.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Savanna.Core.Configuration;
@@ -18,15 +19,15 @@ public sealed class WebSimulationTests
     {
         using var provider = CreateProvider();
         var manager = provider.GetRequiredService<GameManager>();
-        var first = manager.Create();
-        var second = manager.Create();
-        manager.Access(first.Id, game => game.Spawn("Antelope"));
-        manager.Access(first.Id, game => game.Play());
+        var first = manager.Create().Game!;
+        var second = manager.Create().Game!;
+        manager.Access(first.Id, GameCommand.AddAnimal, "Antelope");
+        manager.Access(first.Id, GameCommand.Play);
         manager.Tick();
 
-        Assert.Equal(1, manager.Access(first.Id).Round);
-        Assert.Single(manager.Access(first.Id).Animals);
-        var untouched = manager.Access(second.Id);
+        Assert.Equal(1, manager.Access(first.Id).Game!.Round);
+        Assert.Single(manager.Access(first.Id).Game!.Animals);
+        var untouched = manager.Access(second.Id).Game!;
         Assert.Empty(untouched.Animals);
         Assert.Equal(0, untouched.Round);
         Assert.False(untouched.IsRunning);
@@ -39,16 +40,16 @@ public sealed class WebSimulationTests
     {
         using var provider = CreateProvider();
         var manager = provider.GetRequiredService<GameManager>();
-        var game = manager.Create();
+        var game = manager.Create().Game!;
         manager.Tick();
-        Assert.Equal(0, manager.Access(game.Id).Round);
-        manager.Access(game.Id, session => session.Play());
+        Assert.Equal(0, manager.Access(game.Id).Game!.Round);
+        manager.Access(game.Id, GameCommand.Play);
         manager.Tick();
-        Assert.Throws<InvalidOperationException>(() => manager.Access(game.Id, session => session.Step()));
-        manager.Access(game.Id, session => session.Pause());
+        Assert.Equal(GameResultStatus.Conflict, manager.Access(game.Id, GameCommand.Step).Status);
+        manager.Access(game.Id, GameCommand.Pause);
         manager.Tick();
-        Assert.Equal(1, manager.Access(game.Id).Round);
-        Assert.Equal(2, manager.Access(game.Id, session => session.Step()).Round);
+        Assert.Equal(1, manager.Access(game.Id).Game!.Round);
+        Assert.Equal(2, manager.Access(game.Id, GameCommand.Step).Game!.Round);
     }
 
     /// Summary:
@@ -58,12 +59,12 @@ public sealed class WebSimulationTests
     {
         using var provider = CreateProvider();
         var manager = provider.GetRequiredService<GameManager>();
-        var game = manager.Create();
+        var game = manager.Create().Game!;
         Assert.Contains(game.Species, species => species.Name == "Zebra");
         Assert.Empty(game.Warnings);
-        var spawned = manager.Access(game.Id, session => session.Spawn("Zebra"));
+        var spawned = manager.Access(game.Id, GameCommand.AddAnimal, "Zebra").Game!;
         var original = Assert.Single(spawned.Animals);
-        var advanced = manager.Access(game.Id, session => session.Step());
+        var advanced = manager.Access(game.Id, GameCommand.Step).Game!;
         var zebra = Assert.Single(advanced.Animals);
         Assert.Equal(original.Id, zebra.Id);
         Assert.Equal(1, zebra.Age);
@@ -78,9 +79,9 @@ public sealed class WebSimulationTests
     {
         using var provider = CreateProvider();
         var manager = provider.GetRequiredService<GameManager>();
-        var empty = manager.Create();
-        var populated = manager.Access(empty.Id, game => game.Spawn("Antelope"));
-        var stepped = manager.Access(empty.Id, game => game.Step());
+        var empty = manager.Create().Game!;
+        var populated = manager.Access(empty.Id, GameCommand.AddAnimal, "Antelope").Game!;
+        var stepped = manager.Access(empty.Id, GameCommand.Step).Game!;
         Assert.Empty(empty.Animals);
         Assert.Equal(0, Assert.Single(populated.Animals).Age);
         Assert.Equal(1, Assert.Single(stepped.Animals).Age);
@@ -93,10 +94,10 @@ public sealed class WebSimulationTests
     {
         using var provider = CreateProvider();
         var manager = provider.GetRequiredService<GameManager>();
-        var game = manager.Create();
+        var game = manager.Create().Game!;
         const int animalCount = 25;
-        Parallel.For(0, animalCount, _ => manager.Access(game.Id, session => session.Spawn("Antelope")));
-        var animals = manager.Access(game.Id).Animals;
+        Parallel.For(0, animalCount, _ => manager.Access(game.Id, GameCommand.AddAnimal, "Antelope"));
+        var animals = manager.Access(game.Id).Game!.Animals;
         Assert.Equal(animalCount, animals.Length);
         Assert.Equal(animalCount, animals.Select(animal => animal.Id).Distinct().Count());
         Assert.Equal(animalCount, animals.Select(animal => (animal.Row, animal.Column)).Distinct().Count());
@@ -113,10 +114,10 @@ public sealed class WebSimulationTests
         options.Width = 1;
         options.Height = 1;
         var manager = provider.GetRequiredService<GameManager>();
-        var game = manager.Create();
-        manager.Access(game.Id, session => session.Spawn("Antelope"));
-        Assert.Throws<InvalidOperationException>(() => manager.Access(game.Id, session => session.Spawn("Lion")));
-        Assert.Equal("Antelope", Assert.Single(manager.Access(game.Id).Animals).Species);
+        var game = manager.Create().Game!;
+        manager.Access(game.Id, GameCommand.AddAnimal, "Antelope");
+        Assert.Equal(GameResultStatus.Conflict, manager.Access(game.Id, GameCommand.AddAnimal, "Lion").Status);
+        Assert.Equal("Antelope", Assert.Single(manager.Access(game.Id).Game!.Animals).Species);
     }
 
     /// Summary:
@@ -141,14 +142,14 @@ public sealed class WebSimulationTests
         var clock = new ManualTimeProvider();
         using var provider = CreateProvider(clock);
         var manager = provider.GetRequiredService<GameManager>();
-        var idle = manager.Create();
-        var active = manager.Create();
+        var idle = manager.Create().Game!;
+        var active = manager.Create().Game!;
         clock.Current = clock.Current.AddMinutes(29);
         manager.Access(active.Id);
         clock.Current = clock.Current.AddMinutes(2);
         manager.Tick();
-        Assert.Throws<KeyNotFoundException>(() => manager.Access(idle.Id));
-        Assert.Equal(active.Id, manager.Access(active.Id).Id);
+        Assert.Equal(GameResultStatus.NotFound, manager.Access(idle.Id).Status);
+        Assert.Equal(active.Id, manager.Access(active.Id).Game!.Id);
     }
 
     /// Summary:
@@ -159,12 +160,12 @@ public sealed class WebSimulationTests
         using var provider = CreateProvider();
         provider.GetRequiredService<GameSessionOptions>().MaximumGames = 1;
         var manager = provider.GetRequiredService<GameManager>();
-        var game = manager.Create();
-        Assert.Throws<InvalidOperationException>(() => manager.Create());
+        var game = manager.Create().Game!;
+        Assert.Equal(GameResultStatus.Conflict, manager.Create().Status);
         manager.Delete(game.Id);
         manager.Delete(game.Id);
-        Assert.Throws<KeyNotFoundException>(() => manager.Access(game.Id));
-        Assert.NotEqual(game.Id, manager.Create().Id);
+        Assert.Equal(GameResultStatus.NotFound, manager.Access(game.Id).Status);
+        Assert.NotEqual(game.Id, manager.Create().Game!.Id);
     }
 
     /// Summary:

@@ -78,9 +78,9 @@ test('API validates requests and enforces game lifecycle', async ({ request }) =
   const game = await created.json();
   const root = `/api/games/${game.id}`;
   const invalid = await request.post(`${root}/animals`, { data: { species: 'Dragon' } });
-  expect(invalid.status()).toBe(400);
+  expect(invalid.status()).toBe(422);
   const malformed = await request.post(`${root}/animals`, { data: {} });
-  expect(malformed.status()).toBe(400);
+  expect(malformed.status()).toBe(422);
   expect((await request.post(`${root}/animals`, { data: { species: 'Zebra' } })).ok()).toBeTruthy();
   await request.post(`${root}/play`);
   expect((await request.post(`${root}/step`)).status()).toBe(409);

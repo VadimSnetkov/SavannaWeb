@@ -1,4 +1,5 @@
 using System.Runtime.Loader;
+using Savanna.Core.Exceptions;
 using Savanna.Core.Behavior;
 using Savanna.Core.Configuration;
 using Savanna.Core.Models;
@@ -126,7 +127,7 @@ public sealed class PluginTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void AdvanceRound_FaultyBehaviorStaysAndReportsError(bool throws)
+    public void AdvanceRound_FaultyBehaviorThrowsWithoutApplyingInvalidMovement(bool throws)
     {
         var options = CreateOptions(2, 1, 20m);
         var behavior = new TestAnimalBehavior(AnimalType.Antelope)
@@ -139,19 +140,20 @@ public sealed class PluginTests
         var random = new Random(42);
         var spawner = new AnimalSpawnService(catalog, random);
         var simulation = new SimulationService(
-            options, new SimulationOptionsValidator(), catalog, random,
+            options, new SimulationOptionsValidator(), new AnimalMovementService(catalog, new HealthService(options)), random,
             new HealthService(options), new BirthService(spawner, random));
 
         Assert.True(spawner.TryAddAnimalAt(
             simulation.State, AnimalType.Antelope, new Position(0, 0)));
 
-        simulation.AdvanceRound();
+        var error = Assert.Throws<AnimalBehaviorException>(() => simulation.AdvanceRound());
+        Assert.IsType<InvalidOperationException>(error.InnerException);
+        Assert.Equal(AnimalType.Antelope, error.Species);
 
         var animal = Assert.Single(simulation.State.Animals);
         Assert.Equal(new Position(0, 0), animal.Position);
         Assert.Equal(20m, animal.Health);
-        Assert.False(string.IsNullOrWhiteSpace(catalog.LastBehaviorError));
-        Assert.Equal(1L, simulation.State.Round);
+        Assert.Equal(0L, simulation.State.Round);
     }
 
     /// Summary:
@@ -223,7 +225,7 @@ public sealed class PluginTests
         Assert.Empty(catalog.Warnings);
         var spawner = new AnimalSpawnService(catalog, random);
         var simulation = new SimulationService(
-            options, new SimulationOptionsValidator(), catalog, random,
+            options, new SimulationOptionsValidator(), new AnimalMovementService(catalog, new HealthService(options)), random,
             new HealthService(options), new BirthService(spawner, random));
 
         return (simulation, spawner);

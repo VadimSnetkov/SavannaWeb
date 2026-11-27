@@ -48,39 +48,40 @@ public sealed class GameSessionService
             entry.Key, entry.Value.Symbol.ToString(), entry.Value.SpawnKey.ToString(),
             entry.Value.IsPredator, animals.Count(animal => animal.Species == entry.Key))).ToArray();
         var warnings = _plugins.Warnings.Concat(_catalog.Warnings).ToList();
-        if (_catalog.LastBehaviorError is { } behaviorError) warnings.Add(behaviorError);
         if (_error is not null) warnings.Add(_error);
         return new GameResponse(Id, state.Width, state.Height, state.Round, IsRunning,
             _options.RoundDelayMilliseconds, animals, species, warnings.Distinct().ToArray());
     }
 
     /// Summary:
-    /// Adds one animal or reports that the field has no empty cells.
-    public void Spawn(string species)
+    /// Applies a command and returns a message for expected conflicts instead of throwing.
+    public string? Execute(GameCommand command, string? species = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(species);
-        if (!_spawner.TryAddAnimal(_simulation.State, species))
-            throw new InvalidOperationException("The field is full.");
-    }
+        if (_error is not null && command is not GameCommand.Read and not GameCommand.Pause)
+            return _error;
 
-    /// Summary:
-    /// Starts automatic rounds on the server.
-    public void Play()
-    {
-        _error = null;
-        IsRunning = true;
-    }
-
-    /// Summary:
-    /// Stops automatic rounds while keeping the game available.
-    public void Pause() => IsRunning = false;
-
-    /// Summary:
-    /// Advances exactly one round while the game is paused.
-    public void Step()
-    {
-        if (IsRunning) throw new InvalidOperationException("Pause the game before stepping.");
-        _simulation.AdvanceRound();
+        switch (command)
+        {
+            case GameCommand.Read:
+                break;
+            case GameCommand.AddAnimal:
+                ArgumentException.ThrowIfNullOrWhiteSpace(species);
+                if (!_spawner.TryAddAnimal(_simulation.State, species)) return "The field is full.";
+                break;
+            case GameCommand.Play:
+                IsRunning = true;
+                break;
+            case GameCommand.Pause:
+                IsRunning = false;
+                break;
+            case GameCommand.Step:
+                if (IsRunning) return "Pause the game before stepping.";
+                _simulation.AdvanceRound();
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(command));
+        }
+        return null;
     }
 
     /// Summary:

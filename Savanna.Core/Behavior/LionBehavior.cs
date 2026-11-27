@@ -1,17 +1,17 @@
-﻿using Savanna.Core.Models;
+using Savanna.Core.Models;
 using Savanna.Core.Service;
 
 namespace Savanna.Core.Behavior;
 
 public sealed class LionBehavior : IAnimalBehavior
 {
-    private readonly MovementService _movementService;
+    private readonly IMovementService _movementService;
 
     public string Type => AnimalType.Lion;
 
     /// Summary:
     /// Creates the lion behaviour with shared movement calculations.
-    public LionBehavior(MovementService movementService)
+    public LionBehavior(IMovementService movementService)
     {
         ArgumentNullException.ThrowIfNull(movementService);
 

@@ -1,4 +1,5 @@
 using Savanna.Core.Behavior;
+using Savanna.Core.Exceptions;
 using Savanna.Core.Configuration;
 using Savanna.Core.Models;
 
@@ -11,7 +12,6 @@ public sealed class AnimalCatalog
 
     public IReadOnlyDictionary<string, AnimalOptions> Animals { get; }
     public List<string> Warnings { get; } = [];
-    public string? LastBehaviorError { get; private set; }
 
     /// Summary:
     /// Registers behaviours that have settings and unique species and keys.
@@ -91,9 +91,7 @@ public sealed class AnimalCatalog
         }
         catch (Exception exception)
         {
-            LastBehaviorError =
-                $"{animal.Type}: {exception.GetBaseException().Message}";
-            return animal.Position;
+            throw new AnimalBehaviorException(animal.Type, exception);
         }
     }
 }
